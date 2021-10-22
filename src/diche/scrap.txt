@@ -1,0 +1,22 @@
+<PackageReference Include="HtmlAgilityPack" Version="1.11.37" />
+
+/*foreach (var product in
+    await ScrapeEventPage(client, "https://diverse.direct/tag/2021-10-31-m3-%e7%a7%8b/")) {
+    Console.WriteLine(product);
+}*/
+
+/*private static async Task<IEnumerable<ProductInfo>> ScrapeEventPage(HttpClient client, string url) {
+    var resp = await client.GetStreamAsync(url);
+    var html = new HtmlDocument();
+    html.Load(resp);
+    var res = new List<ProductInfo>();
+    // inc
+    return res;
+}*/
+
+
+internal record ProductInfo(long Id, string Title, string Circle, string Thumbnail)
+{
+    public static implicit operator ProductInfo(Item item) =>
+        new(item.id, item.title, item.circle, item.thumbnail);
+}
