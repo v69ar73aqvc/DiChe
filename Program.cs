@@ -29,16 +29,12 @@ while (chan == null)
     chan = discord.GetChannel(channel);
 }
 
-if (chan is not ITextChannel textChan) throw new InvalidOperationException($"Channel {channel} not found");
+if (chan is not IMessageChannel textChan) throw new InvalidOperationException($"Channel {channel} not found");
 Console.WriteLine("ok");
 HttpClient http = new();
 Console.Write("Initial fetch... ");
-var initial = (await ScrapeJson(http, 1)).ToList();
-HashSet<long> ids = new(initial.Select(v => v.id));
-//HashSet<long> ids = new((await ScrapeJson(http, 1)).Select(v => v.id));
+HashSet<long> ids = new((await ScrapeJson(http, 1)).Select(v => v.id));
 Console.WriteLine($"{ids.Count}");
-await Send(textChan, initial.First());
-return;
 while (true)
 {
     await Task.Delay(TimeSpan.FromSeconds(delaySec));
@@ -60,7 +56,7 @@ while (true)
     }
 }
 
-static async Task Send(ITextChannel chan, Item info)
+static async Task Send(IMessageChannel chan, Item info)
 {
     EmbedBuilder eb = new()
     {
