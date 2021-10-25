@@ -23,12 +23,7 @@ await discord.StartAsync();
 Console.WriteLine("ok");
 Console.Write("Waiting for chan... ");
 SocketChannel? chan = null;
-while (chan == null)
-{
-    await Task.Delay(1000);
-    chan = discord.GetChannel(channel);
-}
-
+while ((chan = discord.GetChannel(channel)) == null) await Task.Delay(1000);
 if (chan is not IMessageChannel textChan) throw new InvalidOperationException($"Channel {channel} not found");
 Console.WriteLine("ok");
 HttpClient http = new();
@@ -49,17 +44,17 @@ while (true)
             {
                 await Send(textChan, product);
             }
-            catch
+            catch (Exception e)
             {
-                // ignored
+                Console.WriteLine(e);
             }
 
             ids.Add(product.id);
         }
     }
-    catch
+    catch (Exception e)
     {
-        // ignored
+        Console.WriteLine(e);
     }
 }
 
