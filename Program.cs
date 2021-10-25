@@ -33,32 +33,38 @@ if (chan is not IMessageChannel textChan) throw new InvalidOperationException($"
 Console.WriteLine("ok");
 HttpClient http = new();
 Console.Write("Initial fetch... ");
-HashSet<long> ids = new((await ScrapeJson(http, 1)).Select(v => v.id));
+HashSet<long> ids = new((await GetJson(http, 1)).Select(v => v.id));
 Console.WriteLine($"{ids.Count}");
 while (true)
 {
     await Task.Delay(TimeSpan.FromSeconds(delaySec));
-    Console.Write($"Fetch {DateTimeOffset.Now}... ");
-    var newProducts = (await ScrapeJson(http, 1)).Where(v => !ids.Contains(v.id));
-    Console.WriteLine($"{ids.Count}");
-    foreach (var product in newProducts)
+    try
     {
-        try
+        Console.Write($"Fetch {DateTimeOffset.Now}... ");
+        var newProducts = (await GetJson(http, 1)).Where(v => !ids.Contains(v.id)).ToList();
+        Console.WriteLine($"{newProducts.Count}");
+        foreach (var product in newProducts)
         {
-            await Send(textChan, product);
-        }
-        catch
-        {
-            // ignored
-        }
+            try
+            {
+                await Send(textChan, product);
+            }
+            catch
+            {
+                // ignored
+            }
 
-        ids.Add(product.id);
+            ids.Add(product.id);
+        }
+    }
+    catch
+    {
+        // ignored
     }
 }
 
 static async Task Send(IMessageChannel chan, Item info)
-{
-    EmbedBuilder eb = new()
+    => await chan.SendMessageAsync(embed: new EmbedBuilder()
     {
         ImageUrl = info.thumbnail,
         Author = new EmbedAuthorBuilder { Name = info.circle },
@@ -70,39 +76,14 @@ static async Task Send(IMessageChannel chan, Item info)
                 ? info.price
                 : $"{info.price} => {info.salePrice}")
         }
-    };
-    await chan.SendMessageAsync(embed: eb.Build());
-}
+    }.Build());
 
-static async Task<IEnumerable<Item>> ScrapeJson(HttpClient client, int page)
-{
-    var itemsResponse = (await JsonSerializer.DeserializeAsync<ItemsResponse>(
-        await client.GetStreamAsync(string.Format(CultureInfo.InvariantCulture, BaseUrl, page))))!;
-    return itemsResponse.data.ToList();
-}
-
+static async Task<IEnumerable<Item>> GetJson(HttpClient client, int page)
+    => (await JsonSerializer.DeserializeAsync<ItemsResponse>(
+        await client.GetStreamAsync(string.Format(CultureInfo.InvariantCulture, BaseUrl, page))))!.data.ToList();
 
 #pragma warning disable 649, 8618
-// ReSharper disable InconsistentNaming
-// ReSharper disable UnusedAutoPropertyAccessor.Global
-internal class ItemsResponse
-{
-    // ReSharper disable once CollectionNeverUpdated.Global
-    public List<Item> data { get; set; }
-}
+internal record ItemsResponse(List<Item> data);
 
-internal class Item
-{
-    public long id { get; set; }
-    public string title { get; set; }
-    public string url { get; set; }
-    public string thumbnail { get; set; }
-    public string circle { get; set; }
-    public string price { get; set; }
-    public string salePrice { get; set; }
-    public bool isSale { get; set; }
-    public bool newly { get; set; }
-}
-// ReSharper restore UnusedAutoPropertyAccessor.Global
-// ReSharper restore InconsistentNaming
+internal record Item(long id, string title, string url, string thumbnail, string circle, string price, string salePrice, bool isSale, bool newly);
 #pragma warning restore 649, 8618
