@@ -9,7 +9,8 @@ using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
 
-const string BaseUrl = "https://diverse.direct/cart/json.php?id={0}";
+const string BaseUrl = "https://diverse.direct/wp-json/dd-front/v1/items?page={0}";
+const string BaseUrlB = "https://diverse.direct/cart/json.php?id={0}";
 const string EnvToken = "diche_discord_token";
 const string EnvChannel = "diche_discord_channel";
 const int delaySec = 30;
@@ -60,7 +61,8 @@ while (remaining.Any())
     List<Item> tmpItems;
     try
     {
-        Console.Write($"Page {pn++} ({remaining.Count} remaining)... ");
+        await Task.Delay(TimeSpan.FromSeconds(0.1));
+        Console.Write($"Page {pn} ({remaining.Count} remaining)... ");
         tmpItems = (await GetJson(http, pn++)).ToList();
         Console.WriteLine($"{tmpItems.Count} in page");
         if (!tmpItems.Any()) throw new ApplicationException();
@@ -154,7 +156,7 @@ static async Task<IEnumerable<Item>> GetJson(HttpClient client, int page)
 
 static async Task<ItemB> GetJsonB(HttpClient client, long id)
     => (await JsonSerializer.DeserializeAsync<Dictionary<string, ItemB>>(
-        await client.GetStreamAsync(string.Format(CultureInfo.InvariantCulture, BaseUrl, id))))!.Values.Single();
+        await client.GetStreamAsync(string.Format(CultureInfo.InvariantCulture, BaseUrlB, id))))!.Values.Single();
 
 #pragma warning disable 649, 8618
 
