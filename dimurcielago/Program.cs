@@ -17,10 +17,15 @@ const int delaySec = 30;
 
 if (args.Length == 0)
 {
-    Console.WriteLine("Need at least 1 id to watch");
+    Console.WriteLine("Need at least 1 <stock:meta> to watch");
     return;
 }
-List<long> ids = args.Select(long.Parse).ToList();
+
+List<(long StockId, long MetaId)> ids = args.Select(a=>{
+    int p = a.IndexOf(':');
+    if(p == -1) throw new ArgumentException($"Invalid entry {a}");
+    return (long.Parse(a[..p]), long.Parse(a[(p+1)..]));
+}).ToList();
 string token = Environment.GetEnvironmentVariable(EnvToken) ?? throw new KeyNotFoundException($"{EnvToken} not found");
 ulong channel = ulong.Parse(Environment.GetEnvironmentVariable(EnvChannel) ??
                             throw new KeyNotFoundException($"{EnvChannel} not found"), CultureInfo.InvariantCulture);
@@ -37,24 +42,24 @@ Console.WriteLine("ok");
 HttpClient http = new();
 Console.Write("Initial fetch... ");
 Dictionary<long, ItemB> entries = new();
-foreach(long id in ids)
+foreach((long metaId, long stockId) in ids)
 {
     try
     {
-        ItemB item = await GetJsonB(http, id);
-        entries[id] = item;
-        Console.WriteLine($"{id}: {item.name} stock {item.stock}");
+        ItemB item = await GetJsonB(http, stockId);
+        entries[stockId] = item;
+        Console.WriteLine($"{stockId}: {item.name} stock {item.stock}");
     }
     catch
     {
-        Console.WriteLine($"Failed to get item {id}, continuing");
+        Console.WriteLine($"Failed to get item {stockId}, continuing");
         // ignored
     }
 }
 Console.WriteLine("ok");
 Console.WriteLine("Scraping page data for extra info.");
 int pn = 1;
-List<long> remaining = entries.Keys.ToList();
+List<long> remaining = ids.Where(id=>entries.ContainsKey(id.StockId)).Select(v=>v.MetaId).ToList();
 Dictionary<long, Item> items = new();
 while (remaining.Any())
 {
@@ -90,23 +95,19 @@ while (true)
     {
         Console.Write($"Fetch {DateTimeOffset.Now}... ");
         List<long> updated = new();
-        foreach(long id in ids)
+        foreach((long metaId, long stockId) in ids)
         {
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(0.1));
-                ItemB item = await GetJsonB(http, id);
-                if (!entries.TryGetValue(id, out ItemB? existingItem))
+                ItemB item = await GetJsonB(http, stockId);
+                if (!entries.TryGetValue(stockId, out ItemB? existingItem) || existingItem.stock <= 0 && item.stock > 0)
                 {
-                    updated.Add(id);
-                    Console.WriteLine($"{id}: {item.name} stock {item.stock}");
+                    updated.Add(stockId);
+                    Console.WriteLine($"{stockId}: {item.name} stock {item.stock}");
+                    await Send(textChan, items[metaId], item);
                 }
-                else if (existingItem.stock <= 0 && item.stock > 0)
-                {
-                    updated.Add(id);
-                    Console.WriteLine($"{id}: {item.name} stock {item.stock}");
-                }
-                entries[id] = item;
+                entries[stockId] = item;
             }
             catch
             {
@@ -114,17 +115,6 @@ while (true)
             }
         }
         Console.WriteLine($"{updated.Count} stock updates of interest");
-        foreach (var u in updated)
-        {
-            try
-            {
-                await Send(textChan, items[u], entries[u]);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-        }
     }
     catch (Exception e)
     {
