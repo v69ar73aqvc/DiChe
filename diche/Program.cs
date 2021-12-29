@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net.Http;
+﻿using System.Globalization;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
 
@@ -28,17 +23,25 @@ if (chan is not IMessageChannel textChan) throw new InvalidOperationException($"
 Console.WriteLine("ok");
 HttpClient http = new();
 Console.Write("Initial fetch... ");
-HashSet<long> ids = new((await GetJson(http, 1)).Select(v => v.id));
+HashSet<long> ids = new((await GetPage(http, 1)).Select(v => v.id));
 Console.WriteLine($"{ids.Count}");
 while (true)
 {
     await Task.Delay(TimeSpan.FromSeconds(delaySec));
+    List<Item> newProducts = new();
+    List<Item> retrieved = new();
     try
     {
-        Console.Write($"Fetch {DateTimeOffset.Now}... ");
-        var newProducts = (await GetJson(http, 1)).Where(v => !ids.Contains(v.id)).ToList();
+        int page = 1;
+        do
+        {
+            Console.Write($"Fetch {DateTimeOffset.Now} (page {page})... ");
+            retrieved.Clear();
+            retrieved.AddRange(await GetPage(http, page++));
+            newProducts.AddRange(retrieved.Where(v => !ids.Contains(v.id)));
+        } while (retrieved.Count != 0 && !retrieved.Select(v => v.id).Intersect(ids).Any());
         Console.WriteLine($"{newProducts.Count}");
-        foreach (var product in newProducts)
+        foreach (Item? product in newProducts)
         {
             try
             {
@@ -51,6 +54,7 @@ while (true)
 
             ids.Add(product.id);
         }
+        newProducts.Clear();
     }
     catch (Exception e)
     {
@@ -73,12 +77,10 @@ static async Task Send(IMessageChannel chan, Item info)
         }
     }.Build());
 
-static async Task<IEnumerable<Item>> GetJson(HttpClient client, int page)
+static async Task<IEnumerable<Item>> GetPage(HttpClient client, int page)
     => (await JsonSerializer.DeserializeAsync<ItemsResponse>(
         await client.GetStreamAsync(string.Format(CultureInfo.InvariantCulture, BaseUrl, page))))!.data.ToList();
 
-#pragma warning disable 649, 8618
 internal record ItemsResponse(List<Item> data);
 
 internal record Item(long id, string title, string url, string thumbnail, string circle, string price, string salePrice, bool isSale, bool newly);
-#pragma warning restore 649, 8618
