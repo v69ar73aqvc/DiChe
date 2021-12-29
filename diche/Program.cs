@@ -8,6 +8,7 @@ const string EnvToken = "diche_discord_token";
 const string EnvChannel = "diche_discord_channel";
 const int delaySec = 60;
 
+int skip = args.Length == 0 ? 0 : int.Parse(args[0]);
 string token = Environment.GetEnvironmentVariable(EnvToken) ?? throw new KeyNotFoundException($"{EnvToken} not found");
 ulong channel = ulong.Parse(Environment.GetEnvironmentVariable(EnvChannel) ??
                             throw new KeyNotFoundException($"{EnvChannel} not found"), CultureInfo.InvariantCulture);
@@ -23,8 +24,8 @@ if (chan is not IMessageChannel textChan) throw new InvalidOperationException($"
 Console.WriteLine("ok");
 HttpClient http = new();
 Console.Write("Initial fetch... ");
-HashSet<long> ids = new((await GetPage(http, 1)).Select(v => v.id));
-Console.WriteLine($"{ids.Count}");
+HashSet<long> ids = new((await GetPage(http, 1)).Skip(skip).Select(v => v.id));
+Console.WriteLine($"{ids.Count} (skip {skip})");
 while (true)
 {
     await Task.Delay(TimeSpan.FromSeconds(delaySec));
